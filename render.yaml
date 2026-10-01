@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: kigali-farm-assistant
+    runtime: node
+    region: frankfurt          # closest to Rwanda; change to oregon/singapore if preferred
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: GEMINI_API_KEY
+        sync: false            # set manually in Render dashboard → Environment
+      - key: ACCESS_CODE
+        sync: false            # set manually in Render dashboard → Environment
+      - key: DB_PATH
+        value: /data/farm.db   # Render persistent disk mount point
+    disk:
+      name: farm-db
+      mountPath: /data
+      sizeGB: 1

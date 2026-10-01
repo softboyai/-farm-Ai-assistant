@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Set these environment variables in the Railway dashboard:
+#   GEMINI_API_KEY   — your Google Gemini API key
+#   ACCESS_CODE      — shared access code for the app
+#   PORT             — Railway injects this automatically

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Farm Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    /* Chat bubble markdown styles */
+    .bubble-content p { margin-bottom: 0.5rem; }
+    .bubble-content p:last-child { margin-bottom: 0; }
+    .bubble-content ul, .bubble-content ol { padding-left: 1.2rem; margin-bottom: 0.5rem; }
+    .bubble-content li { margin-bottom: 0.2rem; }
+    .bubble-content strong { font-weight: 700; }
+    .bubble-content h1,.bubble-content h2,.bubble-content h3 { font-weight: 700; margin-bottom: 0.4rem; }
+  </style>
+</head>
+<body class="bg-green-50 font-sans h-screen flex flex-col" style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+
+<!-- ── Top bar (WhatsApp-style) ──────────────────────────────────────────── -->
+<div class="bg-green-700 text-white flex items-center gap-3 px-4 py-3 shadow-md shrink-0">
+  <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-lg font-bold shrink-0">A</div>
+  <div class="flex-1 min-w-0">
+    <p class="font-semibold text-sm leading-tight">AI Farm Assistant</p>
+    <p id="header-sub" class="text-xs text-green-200 truncate">AI-powered advice for Rwandan farmers</p>
+  </div>
+  <!-- Controls -->
+  <div class="flex items-center gap-2 shrink-0">
+    <select id="crop-select"
+      class="text-xs bg-green-600 text-white border border-green-500 rounded-lg px-2 py-1.5 focus:outline-none cursor-pointer">
+      <option value="maize">Maize</option>
+      <option value="beans">Beans</option>
+      <option value="coffee">Coffee</option>
+      <option value="potatoes">Potatoes</option>
+    </select>
+    <!-- Language pills -->
+    <div class="flex rounded-full border border-green-500 overflow-hidden">
+      <button id="btn-en" onclick="setLang('english')"
+        class="px-3 py-1 text-xs font-bold bg-white text-green-700 transition-colors">EN</button>
+      <button id="btn-rw" onclick="setLang('kinyarwanda')"
+        class="px-3 py-1 text-xs font-bold text-green-200 hover:bg-green-600 transition-colors">RW</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Chat messages area ─────────────────────────────────────────────────── -->
+<div id="chat-window"
+  class="flex-1 overflow-y-auto px-3 py-4 space-y-2"
+  style="background: #e5ded8 url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><text y=%2240%22 font-size=%2230%22 opacity=%220.04%22>🌿</text></svg>') repeat">
+  <!-- Messages injected here -->
+</div>
+
+<!-- ── Input bar ──────────────────────────────────────────────────────────── -->
+<div class="shrink-0 bg-gray-100 border-t border-gray-200 px-3 py-2 flex items-end gap-2">
+  <textarea id="question-input" rows="1"
+    id="lbl-question-ph"
+    placeholder="Ask a farming question…"
+    class="flex-1 rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm resize-none focus:outline-none focus:border-green-400 max-h-32 overflow-y-auto leading-snug"
+    oninput="autoResize(this)"></textarea>
+  <button id="submit-btn" onclick="submitQuestion()"
+    class="w-10 h-10 rounded-full bg-green-600 hover:bg-green-700 disabled:opacity-50 flex items-center justify-center shrink-0 transition-colors">
+    <!-- Send icon -->
+    <svg id="send-icon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+    </svg>
+    <!-- Spinner -->
+    <svg id="btn-spinner" class="hidden animate-spin w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+    </svg>
+  </button>
+</div>
+
+<!-- ── Stats drawer (collapsible) ────────────────────────────────────────── -->
+<div class="shrink-0 bg-white border-t border-gray-200">
+  <button onclick="toggleStats()"
+    class="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:bg-gray-50">
+    <span id="stats-label">Usage Stats</span>
+    <svg id="stats-chevron" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+  <div id="stats-panel" class="hidden px-4 pb-4">
+    <div class="grid grid-cols-2 gap-3">
+      <div class="bg-gray-50 rounded-xl p-3">
+        <p id="lbl-chart-crop" class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">By Crop</p>
+        <canvas id="cropChart" class="max-h-36"></canvas>
+      </div>
+      <div class="bg-gray-50 rounded-xl p-3">
+        <p id="lbl-chart-lang" class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">By Language</p>
+        <canvas id="langChart" class="max-h-36"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+marked.setOptions({ breaks: true });
+
+let currentLang = 'english';
+let cropChart, langChart;
+let statsOpen = false;
+
+const i18n = {
+  english: {
+    headerSub:  'AI-powered advice for Rwandan farmers',
+    placeholder:'Ask a farming question…',
+    chartCrop:  'By Crop',
+    chartLang:  'By Language',
+    statsLabel: 'Usage Stats',
+    errorEmpty: 'Please type a question first.',
+    errorApi:   'Something went wrong. Please try again.',
+    crops: { maize:'Maize', beans:'Beans', coffee:'Coffee', potatoes:'Potatoes' },
+  },
+  kinyarwanda: {
+    headerSub:  'Inama z\'ubuhinzi zikoresheje AI ku bahinzi b\'u Rwanda',
+    placeholder:'Baza ikibazo cy\'ubuhinzi…',
+    chartCrop:  'Ukurikije Igihingwa',
+    chartLang:  'Ukurikije Ururimi',
+    statsLabel: 'Imibare',
+    errorEmpty: 'Injiza ikibazo mbere yo kohereza.',
+    errorApi:   'Hari ikibazo cyabaye. Gerageza nanone.',
+    crops: { maize:'Ibigori', beans:'Ibishyimbo', coffee:'Ikawa', potatoes:'Ibirayi' },
+  },
+};
+
+// ── Language ──────────────────────────────────────────────────────────────────
+function setLang(lang) {
+  currentLang = lang;
+  const t = i18n[lang];
+  document.getElementById('header-sub').textContent        = t.headerSub;
+  document.getElementById('question-input').placeholder    = t.placeholder;
+  document.getElementById('lbl-chart-crop').textContent    = t.chartCrop;
+  document.getElementById('lbl-chart-lang').textContent    = t.chartLang;
+  document.getElementById('stats-label').textContent       = t.statsLabel;
+
+  const sel = document.getElementById('crop-select');
+  ['maize','beans','coffee','potatoes'].forEach(c => {
+    const o = sel.querySelector(`option[value="${c}"]`);
+    if (o) o.textContent = t.crops[c];
+  });
+
+  const btnEn = document.getElementById('btn-en');
+  const btnRw = document.getElementById('btn-rw');
+  if (lang === 'english') {
+    btnEn.className = 'px-3 py-1 text-xs font-bold bg-white text-green-700 transition-colors';
+    btnRw.className = 'px-3 py-1 text-xs font-bold text-green-200 hover:bg-green-600 transition-colors';
+  } else {
+    btnRw.className = 'px-3 py-1 text-xs font-bold bg-white text-green-700 transition-colors';
+    btnEn.className = 'px-3 py-1 text-xs font-bold text-green-200 hover:bg-green-600 transition-colors';
+  }
+}
+
+// ── Textarea auto-resize ──────────────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 128) + 'px';
+}
+
+// ── Chat bubble helpers ───────────────────────────────────────────────────────
+function timeStr() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function addBubble(text, side, crop, lang) {
+  const win = document.getElementById('chat-window');
+
+  const wrapper = document.createElement('div');
+  wrapper.className = side === 'user'
+    ? 'flex justify-end'
+    : 'flex justify-start';
+
+  const bubble = document.createElement('div');
+
+  if (side === 'user') {
+    bubble.className = 'max-w-xs sm:max-w-sm bg-green-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm';
+    bubble.innerHTML = `
+      <p class="text-sm leading-snug">${escHtml(text)}</p>
+      <p class="text-xs text-green-200 text-right mt-1">${timeStr()}</p>`;
+  } else {
+    // Tag line
+    const cropLabel = i18n[currentLang].crops[crop] || crop;
+    const langLabel = lang === 'english' ? 'EN' : 'RW';
+
+    bubble.className = 'max-w-xs sm:max-w-md bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm';
+    bubble.innerHTML = `
+      <div class="flex gap-1.5 mb-2">
+        <span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full">${escHtml(cropLabel)}</span>
+        <span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full">${escHtml(langLabel)}</span>
+      </div>
+      <div class="bubble-content text-sm leading-relaxed">${marked.parse(text)}</div>
+      <p class="text-xs text-gray-400 text-right mt-1">${timeStr()}</p>`;
+  }
+
+  wrapper.appendChild(bubble);
+  win.appendChild(wrapper);
+  win.scrollTop = win.scrollHeight;
+  return bubble;
+}
+
+function addTypingIndicator() {
+  const win = document.getElementById('chat-window');
+  const wrapper = document.createElement('div');
+  wrapper.id = 'typing-indicator';
+  wrapper.className = 'flex justify-start';
+  wrapper.innerHTML = `
+    <div class="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex gap-1 items-center">
+      <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0ms"></span>
+      <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:150ms"></span>
+      <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:300ms"></span>
+    </div>`;
+  win.appendChild(wrapper);
+  win.scrollTop = win.scrollHeight;
+}
+
+function removeTypingIndicator() {
+  document.getElementById('typing-indicator')?.remove();
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+async function submitQuestion() {
+  const input    = document.getElementById('question-input');
+  const question = input.value.trim();
+  const crop     = document.getElementById('crop-select').value;
+  const t        = i18n[currentLang];
+
+  if (!question) return;
+
+  // Show user bubble
+  addBubble(question, 'user', crop, currentLang);
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Loading state
+  const btn     = document.getElementById('submit-btn');
+  const sendIcon = document.getElementById('send-icon');
+  const spinner = document.getElementById('btn-spinner');
+  btn.disabled           = true;
+  sendIcon.classList.add('hidden');
+  spinner.classList.remove('hidden');
+  addTypingIndicator();
+
+  try {
+    const res = await fetch('/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, language: currentLang, crop }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    const data = await res.json();
+    removeTypingIndicator();
+
+    if (!res.ok) {
+      addBubble(data.error || t.errorApi, 'ai', crop, currentLang);
+      return;
+    }
+
+    addBubble(data.answer, 'ai', crop, currentLang);
+    loadStats();
+
+  } catch (err) {
+    removeTypingIndicator();
+    addBubble(t.errorApi, 'ai', crop, currentLang);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    sendIcon.classList.remove('hidden');
+    spinner.classList.add('hidden');
+  }
+}
+
+// Enter = send, Shift+Enter = newline
+document.getElementById('question-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitQuestion(); }
+});
+
+// ── Stats toggle ──────────────────────────────────────────────────────────────
+function toggleStats() {
+  statsOpen = !statsOpen;
+  document.getElementById('stats-panel').classList.toggle('hidden', !statsOpen);
+  document.getElementById('stats-chevron').style.transform = statsOpen ? 'rotate(180deg)' : '';
+  if (statsOpen) loadStats();
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const res = await fetch('/stats');
+    if (!res.ok) return;
+    const { byCrop, byLanguage } = await res.json();
+
+    const cropLabels = byCrop.map(d => ({ maize:'Maize', beans:'Beans', coffee:'Coffee', potatoes:'Potatoes' }[d.crop] || d.crop));
+    if (cropChart) cropChart.destroy();
+    cropChart = new Chart(document.getElementById('cropChart'), {
+      type: 'bar',
+      data: {
+        labels: cropLabels,
+        datasets: [{ data: byCrop.map(d => d.count),
+          backgroundColor: ['#16a34a','#4ade80','#166534','#86efac'],
+          borderRadius: 4, borderSkipped: false }],
+      },
+      options: {
+        responsive: true, plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0fdf4' } },
+          x: { grid: { display: false } },
+        },
+      },
+    });
+
+    const langLabels = byLanguage.map(d => d.language === 'english' ? 'English' : 'Kinyarwanda');
+    if (langChart) langChart.destroy();
+    langChart = new Chart(document.getElementById('langChart'), {
+      type: 'bar',
+      data: {
+        labels: langLabels,
+        datasets: [{ data: byLanguage.map(d => d.count),
+          backgroundColor: ['#16a34a','#4ade80'],
+          borderRadius: 4, borderSkipped: false }],
+      },
+      options: {
+        responsive: true, plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0fdf4' } },
+          x: { grid: { display: false } },
+        },
+      },
+    });
+  } catch (e) { console.warn('Stats failed', e); }
+}
+
+// ── Load history as chat bubbles ──────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const res = await fetch('/history');
+    if (!res.ok) return;
+    const items = await res.json();
+    if (!items.length) return;
+
+    // Show oldest first (history comes newest-first from server)
+    [...items].reverse().forEach(item => {
+      addBubble(item.question, 'user', item.crop, item.language);
+      addBubble(item.answer,   'ai',   item.crop, item.language);
+    });
+  } catch (e) { console.warn('History failed', e); }
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadHistory();
+</script>
+</body>
+</html>
