@@ -1,6 +1,6 @@
 # AI Farm Assistant
 
-A web app that lets farmers ask agricultural questions in English or Kinyarwanda and get practical advice powered by Google Gemini. Built specifically for Rwanda — answers cover planting seasons, pest control, fertilizer use, and crop care for maize, beans, coffee, and potatoes.
+A web app that lets farmers ask agricultural questions in English or Kinyarwanda and get practical advice powered by Google Gemini. Built specifically for Rwanda - answers cover planting seasons, pest control, fertilizer use, and crop care for maize, beans, coffee, and potatoes.
 
 ---
 
